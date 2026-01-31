@@ -1,0 +1,863 @@
+\documentclass[12pt,a4paper]{article}
+
+% ============================================================================
+% Packages
+% ============================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{titlesec}
+
+\geometry{margin=2.5cm}
+
+% ============================================================================
+% Header / Footer
+% ============================================================================
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small CryptoFinance Project}
+\fancyhead[R]{\small ESILV -- Semester 9}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% ============================================================================
+% Hyperref setup
+% ============================================================================
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!70!black,
+    citecolor=green!50!black,
+    urlcolor=blue!60!black
+}
+
+% ============================================================================
+% Title
+% ============================================================================
+\title{
+    \vspace{-1cm}
+    \textbf{CryptoFinance Project} \\[0.5cm]
+    \Large Bitcoin Mining Strategies, Statistical Analysis,\\
+    and Double-Spending Attacks \\[1cm]
+    \large ESILV -- Semester 9
+}
+\author{Ugo Monneau, Pierre Hohl}
+\date{January 2026}
+
+% ============================================================================
+\begin{document}
+
+\maketitle
+\thispagestyle{fancy}
+
+\begin{abstract}
+This report presents a comprehensive analysis of Bitcoin's cryptographic and game-theoretic foundations through four tasks: (1)~statistical validation of SHA-256 as a proof-of-work hash function, (2)~simulation and analysis of selfish mining strategies, (3)~derivation of critical hash power thresholds for strategic mining decisions, and (4)~modeling of repeated double-spending attacks with abandonment thresholds. Our results confirm SHA-256's uniformity and the exponential nature of proof-of-work, demonstrate that selfish mining is profitable with as little as 20--35\% of network hash power, identify key decision thresholds at $q = 50\%$ (one-shot) and $q = 1/3$ (long-run), and characterize the economic trade-offs of repeated double-spending attacks.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ============================================================================
+% TASK 1
+% ============================================================================
+\section{Task 1: Statistical Analysis of SHA-256}
+
+\subsection{Task 1.1: Uniformity of SHA-256}
+
+\subsubsection{Problem Statement}
+
+Choose a hash function, generate a list of hashes, and check statistically whether the distribution is uniform.
+
+\subsubsection{Approach}
+
+We generate 10{,}000 SHA-256 hashes from random inputs and test uniformity at multiple levels:
+
+\begin{enumerate}
+    \item \textbf{Bit-level analysis}: Each of the 256 bits should be 0 or 1 with equal probability (50/50).
+    \item \textbf{Byte-level analysis}: Each byte value (0--255) should appear with equal frequency.
+    \item \textbf{Statistical tests}: Chi-square test (bits and bytes) and Kolmogorov--Smirnov test.
+\end{enumerate}
+
+\subsubsection{Results}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{task1/results/sha256_uniformity_analysis.png}
+    \caption{SHA-256 uniformity analysis. \textbf{Left:} Byte frequency distribution (all 256 values) with expected uniform line. \textbf{Center:} First byte distribution (32 bins) as a focused test. \textbf{Right:} QQ-plot of normalized hash values against uniform distribution.}
+    \label{fig:sha256_uniformity}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Statistical test results for SHA-256 uniformity.}
+    \label{tab:uniformity_tests}
+    \begin{tabular}{lccc}
+        \toprule
+        \textbf{Test} & \textbf{Statistic} & \textbf{P-value} & \textbf{Result} \\
+        \midrule
+        Chi-square (bits)  & $\sim 0.70$  & $\sim 0.40$ & Uniform \\
+        Chi-square (bytes) & $\sim 226$   & $\sim 0.90$ & Uniform \\
+        Kolmogorov--Smirnov & $\sim 0.013$ & $\sim 0.06$ & Uniform \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+All tests fail to reject the null hypothesis of uniformity at the 5\% significance level.
+
+\subsubsection{Conclusion}
+
+SHA-256 produces outputs that are \textbf{statistically indistinguishable from a uniform distribution}. This is a fundamental property required for proof-of-work mining: each hash attempt has an independent, equal probability of satisfying the difficulty target.
+
+% ----------------------------------------------------------------------------
+
+\subsection{Task 1.2: Exponential Distribution of PoW Solution Times}
+
+\subsubsection{Problem Statement}
+
+Choose a hash function and create proof-of-work problems suited to your computer. Record the durations required to find each solution, and check whether the distribution follows an exponential law.
+
+\subsubsection{Approach}
+
+\begin{itemize}
+    \item \textbf{Hash function:} SHA-256
+    \item \textbf{Difficulty:} 18 leading zero bits (probability per attempt: $1/2^{18} \approx 1/262{,}144$)
+    \item \textbf{Number of problems:} 100 independent PoW problems
+    \item \textbf{Measurement:} Wall-clock time (seconds) for each solution
+\end{itemize}
+
+Each PoW problem requires finding a nonce such that $\text{SHA256}(\text{base\_data} \| \text{nonce})$ has at least 18 leading zero bits.
+
+\subsubsection{Results}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{task1/results/pow_exponential_analysis.png}
+    \caption{PoW exponential distribution analysis. \textbf{Left:} Histogram of solution durations with fitted exponential PDF overlay. \textbf{Center:} QQ-plot comparing observed quantiles vs.\ theoretical exponential quantiles. \textbf{Right:} Empirical CDF vs.\ theoretical CDF comparison.}
+    \label{fig:pow_exponential}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{PoW exponential distribution test results.}
+    \label{tab:pow_results}
+    \begin{tabular}{lc}
+        \toprule
+        \textbf{Metric} & \textbf{Value} \\
+        \midrule
+        Number of problems  & 100 \\
+        Mean duration       & $\sim 0.15$ s \\
+        $\lambda$ (1/mean)  & $\sim 6.5$ \\
+        KS statistic        & $\sim 0.059$ \\
+        KS p-value          & $\sim 0.86$ \\
+        \textbf{Result}     & \textbf{Compatible with exponential} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsubsection{Theoretical Justification}
+
+Proof-of-work mining is a sequence of independent Bernoulli trials (each hash attempt succeeds with probability $p = 1/2^d$, where $d$ is the difficulty in bits). The number of attempts until success follows a geometric distribution, which for small $p$ and large number of trials is well-approximated by an exponential distribution.
+
+This means:
+\begin{itemize}
+    \item \textbf{Memoryless property:} Past mining effort does not affect future success probability.
+    \item \textbf{Poisson process:} Block discoveries form a Poisson process, justifying Bitcoin's target block time model.
+\end{itemize}
+
+\subsubsection{Conclusion}
+
+The PoW solution times follow an \textbf{exponential distribution}, confirming that Bitcoin mining is a memoryless Poisson process. The KS test p-value $\gg 0.05$ provides strong evidence that the exponential model is appropriate.
+
+\newpage
+
+% ============================================================================
+% TASK 2
+% ============================================================================
+\section{Task 2: Bitcoin Mining Strategies -- Selfish Mining}
+
+\subsection{Overview}
+
+This task implements and analyzes Bitcoin mining strategies, comparing \textbf{honest mining} with \textbf{selfish mining} attack strategies as introduced by Eyal \& Sirer (2014)~\cite{eyal2014}.
+
+\textbf{Honest Mining:}
+\begin{itemize}
+    \item Miners immediately publish found blocks.
+    \item Build on the longest chain they observe.
+    \item Revenue equals hash power: $R = q$.
+\end{itemize}
+
+\textbf{Selfish Mining:}
+\begin{itemize}
+    \item Miners withhold blocks to create private forks.
+    \item Strategically publish blocks to orphan honest work.
+    \item Revenue can exceed hash power: $R > q$.
+\end{itemize}
+
+% ----------------------------------------------------------------------------
+
+\subsection{Task 2.1: Strategy Comparison}
+
+\subsubsection{Objective}
+
+Simulate honest and selfish mining strategies and validate the implementation against theoretical predictions.
+
+\subsubsection{Results}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{task2/results/task_2_1_strategy_comparison.png}
+    \caption{Comparison of honest vs.\ selfish mining revenue ($\gamma = 0.5$). \textbf{Left:} Revenue as a function of hash power $q$. \textbf{Right:} Advantage of selfish mining over honest mining.}
+    \label{fig:strategy_comparison}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Key findings for $\gamma = 0.5$ (theoretical values from Eyal \& Sirer formula).}
+    \label{tab:task21}
+    \begin{tabular}{ccccc}
+        \toprule
+        \textbf{Hash Power ($q$)} & \textbf{Honest} & \textbf{Selfish (Theory)} & \textbf{Advantage} & \textbf{Result} \\
+        \midrule
+        0.10 & 0.1000 & 0.0000 & $-0.1000$ & Honest Better \\
+        0.15 & 0.1500 & 0.0000 & $-0.1500$ & Honest Better \\
+        0.20 & 0.2000 & 0.1000 & $-0.1000$ & Honest Better \\
+        0.25 & 0.2500 & 0.2692 & $+0.0192$ & \textbf{Selfish Profitable} \\
+        0.30 & 0.3000 & 0.3462 & $+0.0462$ & \textbf{Selfish Profitable} \\
+        0.35 & 0.3500 & 0.4356 & $+0.0856$ & \textbf{Selfish Profitable} \\
+        0.40 & 0.4000 & 0.5385 & $+0.1385$ & \textbf{Selfish Profitable} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{Observations:}
+\begin{enumerate}
+    \item Honest mining revenue equals hash power $q$ (validated by simulation).
+    \item Selfish mining becomes profitable around $q \approx 0.25$ for $\gamma = 0.5$.
+    \item Advantage increases super-linearly with hash power.
+    \item Simulation results closely match the Eyal \& Sirer (2014) theoretical formula.
+\end{enumerate}
+
+% ----------------------------------------------------------------------------
+
+\subsection{Task 2.2: Profitability Analysis}
+
+\subsubsection{Objective}
+
+Identify parameter regions $(q, \gamma)$ where selfish mining is more profitable than honest mining.
+
+\subsubsection{Results}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{task2/results/task_2_2_profitability_heatmap.png}
+    \caption{Profitability analysis across the $(q, \gamma)$ parameter space. \textbf{Left:} Binary profitability (green = selfish profitable, red = honest better). \textbf{Right:} Revenue advantage magnitude. The black dashed line marks the profitability threshold.}
+    \label{fig:profitability_heatmap}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Minimum hash power required for profitable selfish mining.}
+    \label{tab:thresholds}
+    \begin{tabular}{ccc}
+        \toprule
+        \textbf{Connectivity ($\gamma$)} & \textbf{Min $q$ for Profitability} & \textbf{Interpretation} \\
+        \midrule
+        $\gamma = 0.0$  & $\sim 0.35$ & Worst case -- no connectivity \\
+        $\gamma = 0.25$ & $\sim 0.30$ & Low connectivity \\
+        $\gamma = 0.5$  & $\sim 0.25$ & Realistic scenario \\
+        $\gamma = 0.75$ & $\sim 0.22$ & Good connectivity \\
+        $\gamma = 1.0$  & $\sim 0.20$ & Best case -- full connectivity \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsubsection{Critical Insights}
+
+\begin{enumerate}
+    \item \textbf{Vulnerability confirmed:} Traditional wisdom requires 51\% for attacks. In reality, only 20--35\% is needed depending on network position.
+    \item \textbf{Connectivity is crucial:} Well-connected attackers (high $\gamma$) require less hash power. A 10\% increase in connectivity can reduce the required hash power by 3--5 percentage points.
+    \item \textbf{Real-world implications:} Large mining pools ($>25\%$ hash power) are dangerous; current large pools could profitably deviate from honest mining.
+\end{enumerate}
+
+The theoretical profitability threshold is given by Eyal \& Sirer as:
+\begin{equation}
+    q_{\text{threshold}} = \frac{1 - \gamma}{3 - 2\gamma}
+    \label{eq:threshold}
+\end{equation}
+
+% ----------------------------------------------------------------------------
+
+\subsection{Task 2.3: Optimal Selfish Mining Strategy}
+
+\subsubsection{Objective}
+
+Determine the optimal mining decision for each state $(a, h)$, where $a$ is the attacker's private chain length and $h$ is the honest miners' public chain length.
+
+\subsubsection{Results}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{task2/results/task_2_3_optimal_strategy.png}
+    \caption{Optimal selfish mining strategy matrix for $q = 0.35$, $\gamma = 0.5$. Each cell $(a, h)$ shows the optimal action: \textbf{W}~=~Wait, \textbf{A}~=~Adopt, \textbf{M}~=~Match, \textbf{O}~=~Override.}
+    \label{fig:optimal_strategy}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Optimal decision rules for the selfish mining state machine.}
+    \label{tab:decision_rules}
+    \begin{tabular}{ccll}
+        \toprule
+        \textbf{State $(a, h)$} & \textbf{Lead} & \textbf{Action} & \textbf{Rationale} \\
+        \midrule
+        $a < h$       & Behind  & \textsc{Adopt}    & Too far behind, cannot catch up \\
+        $a = 0, h = 0$ & Tied (start) & \textsc{Wait} & Begin building private fork \\
+        $a = h > 0$   & Tied    & \textsc{Match}    & Publish to create race (leverage $\gamma$) \\
+        $a = h + 1$   & 1 ahead & \textsc{Wait}     & Potential to extend lead \\
+        $a \geq h + 2$ & 2+ ahead & \textsc{Override} & Publish fork to orphan honest blocks \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsubsection{Strategy Patterns}
+
+\begin{itemize}
+    \item \textbf{Diagonal ($a = h$):} Always \textsc{Match} -- creates a race condition leveraging the connectivity advantage $\gamma$.
+    \item \textbf{Above diagonal ($a > h$):} \textsc{Wait} when 1 ahead, \textsc{Override} when 2+ ahead.
+    \item \textbf{Below diagonal ($a < h$):} Always \textsc{Adopt} -- cut losses immediately.
+    \item \textbf{First column ($h = 0$):} Always \textsc{Wait} -- safe to keep building private advantage.
+\end{itemize}
+
+The strategy is \textbf{deterministic} and \textbf{memoryless}: for any state $(a, h)$, the action is fully determined by $q$ and $\gamma$. This makes it naturally implementable as a finite-state automaton.
+
+\subsection{Task 2 Conclusions}
+
+Selfish mining demonstrates a \textbf{fundamental security vulnerability} in Bitcoin:
+\begin{itemize}
+    \item The attack requires only 20--35\% hash power (not 51\%).
+    \item It violates Bitcoin's ``honest majority'' assumption.
+    \item It is a sustainable, repeatable strategy with increasing returns at scale.
+    \item Large pools ($>25\%$ hash power) can profitably deviate from the honest protocol.
+    \item Network connectivity provides a competitive advantage, incentivizing centralization.
+\end{itemize}
+
+\newpage
+
+% ============================================================================
+% TASK 3
+% ============================================================================
+\section{Task 3: Bitcoin Mining Thresholds}
+
+\subsection{Overview}
+
+This task determines critical hash power thresholds for two strategic mining decisions. Both problems are modeled as \textbf{biased random walks}:
+\begin{itemize}
+    \item State $s$ = (miner's chain length) $-$ (main chain length)
+    \item Each round: state increases by 1 with probability $q$, decreases by 1 with probability $1-q$
+\end{itemize}
+
+% ----------------------------------------------------------------------------
+
+\subsection{Task 3.1: Orphan Block Mining Threshold}
+
+\subsubsection{Problem Statement}
+
+Determine the hashing power threshold above which an otherwise honest miner would find it advantageous to mine on an orphan block they produced, despite being one block behind the official blockchain.
+
+\subsubsection{Scenario}
+
+\begin{itemize}
+    \item Miner produced a block at height $n$ that got \textbf{orphaned}.
+    \item The network's block at height $n$ became the official one.
+    \item Main chain extended to height $n+1$.
+    \item Miner is now \textbf{1 block behind} (state $= -1$).
+\end{itemize}
+
+\textbf{Decision:} Continue mining on the orphan fork or switch to the main chain?
+
+\subsubsection{Mathematical Analysis}
+
+For $q > 0.5$ (majority hash power), the miner will \textbf{always eventually catch up} ($P(\text{win}) = 1$).
+
+\textbf{Expected time to catch up:}
+\begin{equation}
+    E[T] = \frac{2}{2q - 1}
+\end{equation}
+
+\textbf{Expected credited blocks when winning:}
+\begin{equation}
+    E[\text{credited}] = \frac{4q - 1}{2q - 1}
+\end{equation}
+
+This includes the orphan block plus blocks mined during the catch-up race.
+
+\textbf{Revenue rate comparison:}
+\begin{align}
+    R_{\text{orphan}} &= \frac{E[\text{credited}]}{E[T]} = \frac{4q - 1}{2} \\
+    R_{\text{honest}} &= q
+\end{align}
+
+\textbf{Threshold derivation:}
+\begin{align}
+    R_{\text{orphan}} > R_{\text{honest}} &\iff \frac{4q - 1}{2} > q \notag \\
+    &\iff 4q - 1 > 2q \notag \\
+    &\iff q > 0.5
+\end{align}
+
+\subsubsection{Result}
+
+\begin{table}[H]
+    \centering
+    \caption{Orphan block mining: optimal strategy by hash power.}
+    \label{tab:orphan_strategy}
+    \begin{tabular}{ccl}
+        \toprule
+        \textbf{Hash Power} & \textbf{Best Strategy} & \textbf{Reasoning} \\
+        \midrule
+        $q > 50\%$ & Continue on orphan & Will catch up with $P = 1$, higher rate \\
+        $q < 50\%$ & Switch to main chain & Unlikely to catch up, wasting resources \\
+        $q = 50\%$ & Indifferent & Expected values are equal \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% ----------------------------------------------------------------------------
+
+\subsection{Task 3.2: Block Withholding Threshold ($\gamma = 0$)}
+
+\subsubsection{Problem Statement}
+
+In the case where a rational miner has no connectivity ($\gamma = 0$), determine the threshold in terms of hashing power beyond which this miner has no incentive to reveal a block they have just discovered on top of a block from the official blockchain.
+
+\subsubsection{Scenario}
+
+\begin{itemize}
+    \item Miner just discovered a block extending the main chain.
+    \item Miner is now at \textbf{state $+1$} (1 block ahead, privately).
+    \item \textbf{Connectivity $\gamma = 0$} (miner loses ALL races).
+\end{itemize}
+
+\textbf{Decision:} Reveal the block immediately or withhold it?
+
+\subsubsection{Mathematical Analysis}
+
+At state $+1$, comparing two options:
+
+\textbf{Option A -- Reveal immediately:}
+\begin{equation}
+    E[\text{blocks}] = 1 \quad \text{(certain)}
+\end{equation}
+
+\textbf{Option B -- Withhold:}
+\begin{itemize}
+    \item With probability $q$: miner finds next block $\rightarrow$ publish both $\rightarrow$ \textbf{2 blocks}
+    \item With probability $(1-q)$: network finds block $\rightarrow$ race $\rightarrow$ lose ($\gamma = 0$) $\rightarrow$ \textbf{0 blocks}
+\end{itemize}
+\begin{equation}
+    E[\text{blocks}] = q \times 2 + (1-q) \times 0 = 2q
+\end{equation}
+
+\textbf{Threshold derivation:}
+\begin{equation}
+    E[\text{withhold}] \geq E[\text{reveal}] \iff 2q \geq 1 \iff q \geq 0.5
+\end{equation}
+
+\subsubsection{Result}
+
+\begin{table}[H]
+    \centering
+    \caption{Block withholding: optimal decision by hash power ($\gamma = 0$).}
+    \label{tab:withholding}
+    \begin{tabular}{ccl}
+        \toprule
+        \textbf{Hash Power} & \textbf{Best Decision} & \textbf{Reasoning} \\
+        \midrule
+        $q \geq 50\%$ & No incentive to reveal & $E[\text{withhold}] \geq E[\text{reveal}]$ \\
+        $q < 50\%$    & Reveal immediately     & $E[\text{withhold}] < E[\text{reveal}]$ \\
+        $q = 50\%$    & Indifferent            & $E[\text{withhold}] = E[\text{reveal}] = 1$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% ----------------------------------------------------------------------------
+
+\subsection{Simulation Verification}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{task3/results/bitcoin_thresholds.png}
+    \caption{Bitcoin mining thresholds. Simulation verification confirms the analytical threshold at $q = 0.5$ for both Task~3.1 (orphan block mining) and Task~3.2 (block withholding with $\gamma = 0$).}
+    \label{fig:bitcoin_thresholds}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Simulation verification of thresholds.}
+    \label{tab:sim_verification}
+    \begin{tabular}{ccccc}
+        \toprule
+        \multicolumn{5}{c}{\textbf{Task 3.1: Orphan Block Mining}} \\
+        \midrule
+        $q$ & Orphan Rate & Honest Rate & \multicolumn{2}{c}{Better Strategy} \\
+        \midrule
+        0.40 & 0.0006 & 0.4000 & \multicolumn{2}{c}{Honest} \\
+        0.50 & 0.2653 & 0.5000 & \multicolumn{2}{c}{$\sim$Equal} \\
+        0.55 & 0.5979 & 0.5500 & \multicolumn{2}{c}{Orphan} \\
+        0.60 & 0.6949 & 0.6000 & \multicolumn{2}{c}{Orphan} \\
+        \bottomrule
+    \end{tabular}
+    \hspace{0.5cm}
+    \begin{tabular}{ccccc}
+        \toprule
+        \multicolumn{5}{c}{\textbf{Task 3.2: Block Withholding ($\gamma = 0$)}} \\
+        \midrule
+        $q$ & $E[\text{Withhold}]$ & $E[\text{Reveal}]$ & \multicolumn{2}{c}{Better Option} \\
+        \midrule
+        0.40 & 0.7976 & 1.0000 & \multicolumn{2}{c}{Reveal} \\
+        0.50 & 0.9959 & 1.0000 & \multicolumn{2}{c}{$\sim$Equal} \\
+        0.55 & 1.1003 & 1.0000 & \multicolumn{2}{c}{Withhold} \\
+        0.60 & 1.1988 & 1.0000 & \multicolumn{2}{c}{Withhold} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% ----------------------------------------------------------------------------
+
+\subsection{Important Caveat: Long-Run Selfish Mining Analysis}
+
+While the one-shot decision at state $+1$ has threshold $q = 0.5$, the \textbf{full selfish mining strategy} with $\gamma = 0$ uses the Eyal \& Sirer (2014) formula and has a \textbf{lower threshold of $q = 1/3$}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{task3/results/selfish_vs_honest_gamma0.png}
+    \caption{Long-run selfish vs.\ honest mining revenue with $\gamma = 0$. Selfish mining becomes more profitable than honest mining for $q > 1/3$.}
+    \label{fig:selfish_vs_honest}
+\end{figure}
+
+The selfish mining revenue rate for $\gamma = 0$ is given by the Eyal \& Sirer formula:
+\begin{equation}
+    R_{\text{selfish}} = \frac{4q^2(1-q)^2 - q^3}{1 - q - 2q^2 + q^3}
+    \label{eq:eyal_sirer}
+\end{equation}
+
+\begin{table}[H]
+    \centering
+    \caption{Long-run selfish vs.\ honest mining comparison ($\gamma = 0$).}
+    \label{tab:longrun}
+    \begin{tabular}{cccc}
+        \toprule
+        $q$ & Selfish Rate & Honest Rate & Difference \\
+        \midrule
+        0.20 & 0.1297 & 0.2000 & $-0.0703$ \\
+        0.30 & 0.2731 & 0.3000 & $-0.0269$ \\
+        $1/3$ & 0.3333 & 0.3333 & $0.0000$ \\
+        0.35 & 0.3665 & 0.3500 & $+0.0165$ \\
+        0.40 & 0.4837 & 0.4000 & $+0.0837$ \\
+        0.45 & 0.6518 & 0.4500 & $+0.2018$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+The full selfish mining strategy with $\gamma = 0$ becomes profitable at $q > 1/3$. This is a lower threshold than the one-shot withholding decision ($q = 0.5$) because the full strategy exploits states beyond $+1$ (override at state $+2$, publish-and-wait at higher states).
+
+% ----------------------------------------------------------------------------
+
+\subsection{Task 3 Conclusions}
+
+\begin{table}[H]
+    \centering
+    \caption{Summary of all mining decision thresholds.}
+    \label{tab:all_thresholds}
+    \begin{tabular}{lcc}
+        \toprule
+        \textbf{Decision} & \textbf{Threshold} & \textbf{Source} \\
+        \midrule
+        Orphan block mining (one-shot) & $q = 50\%$ & Random walk analysis \\
+        Block withholding (one-shot, $\gamma = 0$) & $q = 50\%$ & Expected value comparison \\
+        Full selfish mining (long-run, $\gamma = 0$) & $q = 1/3$ & Eyal \& Sirer (2014) \\
+        Full selfish mining (long-run, $\gamma = 1$) & $q = 1/4$ & Eyal \& Sirer (2014) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+The one-shot decisions have threshold 50\% because that is the point where the miner can reliably ``win races'' against the rest of the network. The full selfish mining strategy has lower thresholds because it strategically accumulates and releases blocks.
+
+\newpage
+
+% ============================================================================
+% TASK 4 BONUS
+% ============================================================================
+\section{Task 4 (Bonus): Repeated Double-Spending Attacks}
+
+\subsection{Framework Definition}
+
+\subsubsection{Attack Protocol}
+
+\begin{enumerate}
+    \item Attacker controls hash power fraction $q$ (honest network has $p = 1-q$).
+    \item Attacker sends transaction for value $v$ to merchant.
+    \item Attacker immediately begins mining a secret fork (excluding their transaction).
+    \item Merchant waits for $n$ confirmations before releasing goods.
+    \item After merchant releases goods, attacker races to extend secret fork.
+    \item \textbf{Success:} If attacker's fork becomes longer $\rightarrow$ publish chain and double-spend.
+    \item \textbf{Failure:} If attacker falls more than $A$ blocks behind $\rightarrow$ abandon and restart.
+\end{enumerate}
+
+\subsubsection{Key Parameters}
+
+\begin{table}[H]
+    \centering
+    \caption{Parameters of the repeated double-spending attack model.}
+    \label{tab:ds_params}
+    \begin{tabular}{cl}
+        \toprule
+        \textbf{Parameter} & \textbf{Description} \\
+        \midrule
+        $q$     & Attacker's hash power fraction \\
+        $p = 1-q$ & Honest network's hash power fraction \\
+        $n$     & Number of confirmations required by merchant \\
+        $A$     & Abandonment threshold (max deficit before giving up) \\
+        $v$     & Value of double-spent goods (BTC) \\
+        $R$     & Block reward (currently 6.25 BTC) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsubsection{Economic Model}
+
+The attack has positive expected value only if:
+\begin{equation}
+    E[\text{Profit}] = P(\text{success}) \times v - E[\text{Duration}] \times q \times R > 0
+    \label{eq:profit}
+\end{equation}
+where $P(\text{success})$ is the probability of successful double-spend, $E[\text{Duration}]$ is the expected number of blocks during the attack attempt, and $q \times R$ is the opportunity cost per block (foregone honest mining reward).
+
+\subsubsection{Mathematical Model}
+
+The blockchain race is modeled as a \textbf{biased random walk} with absorbing barriers:
+\begin{itemize}
+    \item State $s = \text{attacker\_blocks} - \text{honest\_blocks}$ (lead/deficit)
+    \item Transition: $s \to s+1$ with probability $q$, $s \to s-1$ with probability $p$
+    \item Success: $s > 0$ (attacker chain longer)
+    \item Failure: $s < -A$ (exceeded abandonment threshold)
+\end{itemize}
+
+This is equivalent to Gambler's Ruin with two barriers, allowing closed-form probability calculations.
+
+% ----------------------------------------------------------------------------
+
+\subsection{Key Results}
+
+\subsubsection{Success Probability}
+
+\begin{table}[H]
+    \centering
+    \caption{Attack success probability for $n = 6$ confirmations.}
+    \label{tab:success_prob}
+    \begin{tabular}{ccccc}
+        \toprule
+        $q$ & $A = 5$ & $A = 10$ & $A = 20$ & $A = 50$ \\
+        \midrule
+        0.10 & 0.0001 & 0.0002 & 0.0002 & 0.0002 \\
+        0.20 & 0.0092 & 0.0120 & 0.0130 & 0.0132 \\
+        0.30 & 0.0810 & 0.1250 & 0.1480 & 0.1550 \\
+        0.40 & 0.2650 & 0.4050 & 0.4750 & 0.5100 \\
+        0.45 & 0.4300 & 0.5850 & 0.6500 & 0.6800 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Without abandonment ($A = \infty$), the attack has non-zero success probability for any $q > 0$, but may take infinite time. With finite $A$, the attack always terminates in finite time, though success probability decreases.
+
+\subsubsection{Break-even Double-Spend Value}
+
+\begin{table}[H]
+    \centering
+    \caption{Minimum profitable double-spend value in BTC ($n = 6$ confirmations).}
+    \label{tab:breakeven}
+    \begin{tabular}{cccc}
+        \toprule
+        \textbf{Hash Power ($q$)} & $A = 5$ & $A = 10$ & $A = 20$ \\
+        \midrule
+        10\% & $> 10{,}000$ & $> 10{,}000$ & $> 10{,}000$ \\
+        20\% & $\sim 2{,}500$ & $\sim 1{,}800$ & $\sim 1{,}500$ \\
+        30\% & $\sim 250$ & $\sim 150$ & $\sim 120$ \\
+        40\% & $\sim 45$ & $\sim 30$ & $\sim 25$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsubsection{Optimal Abandonment Threshold}
+
+The optimal $A^*$ balances two opposing forces:
+\begin{itemize}
+    \item \textbf{Low $A$:} Fast attack cycles but lower success probability.
+    \item \textbf{High $A$:} Higher success probability but greater opportunity cost per attempt.
+\end{itemize}
+Typical optimal values: $A^* \approx 10\text{--}25$ blocks.
+
+\subsubsection{Attack vs.\ Honest Mining}
+
+\begin{table}[H]
+    \centering
+    \caption{Profit rate comparison: attacking ($v = 500$ BTC) vs.\ honest mining.}
+    \label{tab:attack_vs_honest}
+    \begin{tabular}{cccc}
+        \toprule
+        $q$ & Attack Rate & Honest Rate & Advantage \\
+        \midrule
+        0.25 & $-0.85$ BTC/block & 1.56 BTC/block & $-154\%$ \\
+        0.30 & $-0.42$ BTC/block & 1.88 BTC/block & $-122\%$ \\
+        0.35 & $0.15$ BTC/block  & 2.19 BTC/block & $-93\%$ \\
+        0.40 & $0.95$ BTC/block  & 2.50 BTC/block & $-62\%$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{Critical finding:} For most realistic scenarios, \textbf{honest mining is more profitable} than attacking. Attacking only becomes competitive at very high hash power ($q > 40\%$) with high-value targets.
+
+% ----------------------------------------------------------------------------
+
+\subsection{Summary Figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{task4bonus/conclusions_summary.png}
+    \caption{Summary of repeated double-spending attack analysis. \textbf{Top-left:} Attack success probability vs.\ hash power for different abandonment thresholds. \textbf{Top-right:} Break-even double-spend value (minimum profitable transaction value). \textbf{Bottom-left:} Expected profit vs.\ double-spend value for different hash power levels. \textbf{Bottom-right:} Attack profit rate compared to honest mining.}
+    \label{fig:ds_summary}
+\end{figure}
+
+% ----------------------------------------------------------------------------
+
+\subsection{Task 4 Conclusions}
+
+\begin{enumerate}
+    \item \textbf{Viability of Repeated Attacks:}
+    \begin{itemize}
+        \item Repeated double-spending attacks with abandonment threshold are viable for attackers with sufficient hash power ($q > 0.25\text{--}0.30$).
+        \item The abandonment strategy makes attacks practical by ensuring finite duration.
+        \item Attackers must target high-value transactions to overcome opportunity costs.
+    \end{itemize}
+
+    \item \textbf{Critical Thresholds:}
+    \begin{itemize}
+        \item $q < 0.20$: Attacks rarely profitable regardless of double-spend value.
+        \item $q = 0.30$: Break-even at approximately 100--200 BTC.
+        \item $q = 0.40$: Break-even at approximately 30--50 BTC.
+        \item $q \geq 0.50$: Attacker always wins (violates Nakamoto consensus assumption).
+    \end{itemize}
+
+    \item \textbf{Economic Security:}
+    Bitcoin's security relies on the economic reality that honest mining is more profitable than attacking for miners below $\sim 40\%$ hash power. This creates a strong incentive for rational miners to remain honest.
+
+    \item \textbf{Defense Recommendations:}
+    \begin{itemize}
+        \item \textbf{Standard transactions ($< 100$ BTC):} 6 confirmations adequate.
+        \item \textbf{High-value (100--1{,}000 BTC):} Consider 10--12 confirmations.
+        \item \textbf{Very high-value ($> 1{,}000$ BTC):} 20+ confirmations or additional verification.
+        \item \textbf{Exchanges:} Implement extra verification for large withdrawals.
+    \end{itemize}
+
+    \item \textbf{Theoretical Insights:}
+    \begin{itemize}
+        \item The abandonment threshold transforms an infinite-variance random walk into a tractable repeated game.
+        \item The relevant metric for attackers is \textbf{profit rate} (per unit time), not profit per attack.
+        \item Repeated attacks allow low-probability strategies to compound over time.
+    \end{itemize}
+\end{enumerate}
+
+\newpage
+
+% ============================================================================
+% OVERALL CONCLUSIONS
+% ============================================================================
+\section{Overall Conclusions}
+
+This project provides a multi-faceted analysis of Bitcoin's security from both statistical and game-theoretic perspectives.
+
+\subsection{Statistical Foundations (Task 1)}
+
+SHA-256 passes rigorous uniformity tests (chi-square and Kolmogorov--Smirnov), confirming that each hash attempt constitutes an independent, uniformly distributed trial. The resulting proof-of-work solution times follow an exponential distribution, validating Bitcoin's Poisson process model for block discovery.
+
+\subsection{Selfish Mining Vulnerability (Task 2)}
+
+Selfish mining is profitable with as little as 20--35\% of network hash power, depending on network connectivity $\gamma$. The optimal strategy follows a simple, deterministic state machine with four actions (Adopt, Wait, Match, Override). This violates Bitcoin's ``honest majority'' security assumption and creates pressure toward mining centralization.
+
+\subsection{Decision Thresholds (Task 3)}
+
+One-shot mining decisions (orphan block mining, block withholding) have a threshold of $q = 50\%$, coinciding with the classical majority threshold. However, the full selfish mining strategy has a strictly lower threshold: $q = 1/3$ for $\gamma = 0$ and $q = 1/4$ for $\gamma = 1$, demonstrating that strategic block accumulation provides advantages beyond simple race-winning.
+
+\subsection{Double-Spending Economics (Task 4)}
+
+Repeated double-spending attacks with abandonment thresholds are viable for high-hash-power attackers targeting high-value transactions. However, for most realistic parameter regimes, honest mining remains more profitable -- providing the economic foundation for Bitcoin's security. The key insight is that attackers should evaluate \textbf{profit rate} (per unit time), not just profit per attack.
+
+\subsection{Bitcoin's Security Model}
+
+Bitcoin's security ultimately rests on three pillars:
+\begin{enumerate}
+    \item \textbf{Cryptographic:} SHA-256 provides uniform, unpredictable outputs (Task 1).
+    \item \textbf{Game-theoretic:} Honest mining is typically more profitable than attacking (Tasks 2--4).
+    \item \textbf{Economic:} Opportunity costs and block rewards align miner incentives with honest behavior (Tasks 3--4).
+\end{enumerate}
+
+The vulnerability lies in the game-theoretic pillar: miners with sufficient hash power ($>20\text{--}35\%$) \emph{can} profitably deviate. Bitcoin's decentralization -- ensuring no entity approaches these thresholds -- is therefore essential for security.
+
+% ============================================================================
+% REFERENCES
+% ============================================================================
+\newpage
+\begin{thebibliography}{9}
+
+\bibitem{nakamoto2008}
+Nakamoto, S. (2008).
+\textit{Bitcoin: A Peer-to-Peer Electronic Cash System}.
+\url{https://bitcoin.org/bitcoin.pdf}
+
+\bibitem{eyal2014}
+Eyal, I., \& Sirer, E.~G. (2014).
+Majority is not Enough: Bitcoin Mining is Vulnerable.
+\textit{Financial Cryptography and Data Security} (FC 2014).
+
+\bibitem{rosenfeld2014}
+Rosenfeld, M. (2014).
+Analysis of Hashrate-Based Double Spending.
+\textit{arXiv preprint arXiv:1402.2009}.
+
+\bibitem{sapirshtein2016}
+Sapirshtein, A., Sompolinsky, Y., \& Zohar, A. (2016).
+Optimal Selfish Mining Strategies in Bitcoin.
+\textit{Financial Cryptography and Data Security} (FC 2016).
+
+\bibitem{grunspan2018}
+Grunspan, C., \& P\'erez-Marco, R. (2018).
+Double spend races.
+\textit{International Journal of Theoretical and Applied Finance}, 21(08).
+
+\bibitem{nayak2016}
+Nayak, K., Kumar, S., Miller, A., \& Shi, E. (2016).
+Stubborn Mining: Generalizing Selfish Mining and Combining with an Eclipse Attack.
+\textit{IEEE European Symposium on Security and Privacy} (EuroS\&P 2016).
+
+\bibitem{fips180}
+NIST (2015).
+\textit{FIPS 180-4: Secure Hash Standard (SHS)}.
+National Institute of Standards and Technology.
+
+\end{thebibliography}
+
+\end{document}

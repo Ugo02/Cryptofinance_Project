@@ -6,6 +6,7 @@ Generates a list of hashes and checks if the distribution is uniform
 
 import hashlib
 import random
+import os
 import numpy as np
 from collections import Counter
 from scipy import stats
@@ -207,6 +208,87 @@ def kolmogorov_smirnov_test(hashes):
     }
 
 
+def plot_uniformity_visualizations(hashes, output_dir='results'):
+    """
+    Generate visualizations for the uniformity analysis.
+
+    Produces:
+    - Histogram of byte frequencies with expected uniform line
+    - QQ-plot of normalized hash values against uniform distribution
+
+    Args:
+        hashes: List of hexadecimal hashes
+        output_dir: Directory to save plots
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+    # --- Plot 1: Byte frequency histogram ---
+    ax1 = axes[0]
+    all_bytes = []
+    for hash_hex in hashes:
+        all_bytes.extend(bytes.fromhex(hash_hex))
+
+    byte_freq = [0] * 256
+    for b in all_bytes:
+        byte_freq[b] += 1
+
+    expected = len(all_bytes) / 256
+
+    ax1.bar(range(256), byte_freq, width=1.0, color='steelblue', alpha=0.7,
+            label='Observed')
+    ax1.axhline(y=expected, color='red', linestyle='--', linewidth=2,
+                label=f'Expected (uniform) = {expected:.0f}')
+    ax1.set_xlabel('Byte value (0-255)', fontsize=11)
+    ax1.set_ylabel('Frequency', fontsize=11)
+    ax1.set_title('Byte Frequency Distribution', fontsize=12, fontweight='bold')
+    ax1.legend(fontsize=9)
+    ax1.set_xlim([-1, 256])
+
+    # --- Plot 2: First-byte histogram (zoomed) ---
+    ax2 = axes[1]
+    first_bytes = [int(h[:2], 16) for h in hashes]
+    ax2.hist(first_bytes, bins=32, range=(0, 256), color='steelblue',
+             alpha=0.7, edgecolor='black', linewidth=0.3, label='Observed')
+    ax2.axhline(y=len(hashes) / 32, color='red', linestyle='--', linewidth=2,
+                label=f'Expected = {len(hashes)/32:.0f}')
+    ax2.set_xlabel('First byte value', fontsize=11)
+    ax2.set_ylabel('Frequency', fontsize=11)
+    ax2.set_title('First Byte Distribution (32 bins)', fontsize=12,
+                  fontweight='bold')
+    ax2.legend(fontsize=9)
+
+    # --- Plot 3: QQ-plot ---
+    ax3 = axes[2]
+    normalized_values = []
+    for hash_hex in hashes:
+        hash_int = int(hash_hex, 16)
+        normalized = hash_int / (2**256 - 1)
+        normalized_values.append(normalized)
+
+    normalized_values.sort()
+    n = len(normalized_values)
+    theoretical_quantiles = [(i + 0.5) / n for i in range(n)]
+
+    ax3.scatter(theoretical_quantiles, normalized_values, s=1, alpha=0.5,
+                color='steelblue')
+    ax3.plot([0, 1], [0, 1], 'r--', linewidth=2, label='Perfect uniform')
+    ax3.set_xlabel('Theoretical quantiles (Uniform)', fontsize=11)
+    ax3.set_ylabel('Observed quantiles', fontsize=11)
+    ax3.set_title('QQ-Plot: SHA256 vs Uniform', fontsize=12, fontweight='bold')
+    ax3.legend(fontsize=9)
+    ax3.set_xlim([0, 1])
+    ax3.set_ylim([0, 1])
+    ax3.set_aspect('equal')
+
+    plt.tight_layout()
+    save_path = os.path.join(output_dir, 'sha256_uniformity_analysis.png')
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    print(f"\nSaved: {save_path}")
+    plt.close()
+
+
 def main():
     """
     Main function to execute statistical tests
@@ -214,14 +296,14 @@ def main():
     print("=" * 70)
     print("Statistical test of SHA256 distribution uniformity")
     print("=" * 70)
-    
+
     # Parameters
     n_samples = 10000
-    
+
     print(f"\nGenerating {n_samples} random SHA256 hashes...")
     hashes = generate_hash_list(n_samples)
-    print(f"✓ {len(hashes)} hashes generated")
-    
+    print(f"Generated {len(hashes)} hashes")
+
     # Analyze bit distribution
     print("\n" + "-" * 70)
     print("1. Bit distribution analysis")
@@ -231,7 +313,7 @@ def main():
     print(f"Number of 0s: {bit_stats['zeros']} ({bit_stats['zero_ratio']*100:.2f}%)")
     print(f"Number of 1s: {bit_stats['ones']} ({bit_stats['one_ratio']*100:.2f}%)")
     print(f"Expected ratio for uniform distribution: 50% / 50%")
-    
+
     # Analyze byte distribution
     print("\n" + "-" * 70)
     print("2. Byte distribution analysis")
@@ -240,7 +322,7 @@ def main():
     print(f"Total number of bytes: {byte_stats['total_bytes']}")
     print(f"Number of unique byte values: {byte_stats['unique_bytes']}/256")
     print(f"Expected frequency per byte (uniform): {byte_stats['expected_frequency']:.2f}")
-    
+
     # Chi-square test on bits
     print("\n" + "-" * 70)
     print("3. Chi-square test - Bit distribution")
@@ -250,7 +332,7 @@ def main():
     print(f"Degrees of freedom: {chi_bit['degrees_of_freedom']}")
     print(f"P-value: {chi_bit['p_value']:.6f}")
     print(f"Result: {chi_bit['interpretation']}")
-    
+
     # Chi-square test on bytes
     print("\n" + "-" * 70)
     print("4. Chi-square test - Byte distribution")
@@ -260,7 +342,7 @@ def main():
     print(f"Degrees of freedom: {chi_byte['degrees_of_freedom']}")
     print(f"P-value: {chi_byte['p_value']:.6f}")
     print(f"Result: {chi_byte['interpretation']}")
-    
+
     # Kolmogorov-Smirnov test
     print("\n" + "-" * 70)
     print("5. Kolmogorov-Smirnov test")
@@ -269,26 +351,30 @@ def main():
     print(f"KS statistic: {ks_result['ks_statistic']:.6f}")
     print(f"P-value: {ks_result['p_value']:.6f}")
     print(f"Result: {ks_result['interpretation']}")
-    
+
     # Summary
     print("\n" + "=" * 70)
     print("SUMMARY")
     print("=" * 70)
-    print(f"✓ Bit distribution: {chi_bit['interpretation']}")
-    print(f"✓ Byte distribution: {chi_byte['interpretation']}")
-    print(f"✓ KS test: {ks_result['interpretation']}")
-    
+    print(f"  Bit distribution: {chi_bit['interpretation']}")
+    print(f"  Byte distribution: {chi_byte['interpretation']}")
+    print(f"  KS test: {ks_result['interpretation']}")
+
     # General conclusion
-    all_uniform = (chi_bit['is_uniform'] and chi_byte['is_uniform'] and 
+    all_uniform = (chi_bit['is_uniform'] and chi_byte['is_uniform'] and
                    ks_result['is_uniform'])
-    
+
     print("\n" + "=" * 70)
     if all_uniform:
         print("CONCLUSION: SHA256 distribution appears UNIFORM according to statistical tests")
     else:
         print("CONCLUSION: Some tests suggest a NON-UNIFORM distribution")
     print("=" * 70)
-    
+
+    # Generate visualizations
+    print("\nGenerating visualizations...")
+    plot_uniformity_visualizations(hashes)
+
     return hashes, bit_stats, byte_stats, chi_bit, chi_byte, ks_result
 
 

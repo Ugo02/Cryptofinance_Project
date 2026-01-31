@@ -10,12 +10,15 @@ Goal:
 """
 
 import hashlib
+import math
+import os
 import random
 import time
 from dataclasses import dataclass
 from typing import List, Tuple
 
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy import stats
 
 
@@ -177,12 +180,89 @@ def summarize_attempts(results: List[PowResult]) -> dict:
     }
 
 
+def plot_exponential_visualizations(durations: np.ndarray, output_dir='results'):
+    """
+    Generate visualizations for the exponential distribution analysis.
+
+    Produces:
+    - Histogram of durations with fitted exponential PDF overlay
+    - QQ-plot against exponential distribution
+    - Empirical vs theoretical CDF
+
+    Args:
+        durations: Array of PoW solution times
+        output_dir: Directory to save plots
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    mean_dur = durations.mean()
+    lambda_hat = 1.0 / mean_dur
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+    # --- Plot 1: Histogram + fitted exponential PDF ---
+    ax1 = axes[0]
+    ax1.hist(durations, bins=30, density=True, color='steelblue', alpha=0.7,
+             edgecolor='black', linewidth=0.3, label='Observed durations')
+
+    x = np.linspace(0, durations.max() * 1.1, 200)
+    pdf = lambda_hat * np.exp(-lambda_hat * x)
+    ax1.plot(x, pdf, 'r-', linewidth=2,
+             label=f'Fitted Exp(lambda={lambda_hat:.2f})')
+    ax1.set_xlabel('Duration (seconds)', fontsize=11)
+    ax1.set_ylabel('Probability density', fontsize=11)
+    ax1.set_title('PoW Duration Distribution', fontsize=12, fontweight='bold')
+    ax1.legend(fontsize=9)
+
+    # --- Plot 2: QQ-plot ---
+    ax2 = axes[1]
+    sorted_durations = np.sort(durations)
+    n = len(sorted_durations)
+    theoretical_quantiles = stats.expon.ppf(
+        (np.arange(1, n + 1) - 0.5) / n, scale=mean_dur
+    )
+
+    ax2.scatter(theoretical_quantiles, sorted_durations, s=15, alpha=0.6,
+                color='steelblue', edgecolor='none')
+    max_val = max(theoretical_quantiles.max(), sorted_durations.max())
+    ax2.plot([0, max_val], [0, max_val], 'r--', linewidth=2,
+             label='Perfect exponential')
+    ax2.set_xlabel('Theoretical quantiles (Exponential)', fontsize=11)
+    ax2.set_ylabel('Observed quantiles', fontsize=11)
+    ax2.set_title('QQ-Plot: Durations vs Exponential', fontsize=12,
+                  fontweight='bold')
+    ax2.legend(fontsize=9)
+    ax2.set_aspect('equal')
+
+    # --- Plot 3: Empirical CDF vs Theoretical CDF ---
+    ax3 = axes[2]
+    ecdf_y = np.arange(1, n + 1) / n
+    ax3.step(sorted_durations, ecdf_y, where='post', color='steelblue',
+             linewidth=1.5, label='Empirical CDF')
+
+    x_cdf = np.linspace(0, sorted_durations.max() * 1.1, 200)
+    theoretical_cdf = 1 - np.exp(-lambda_hat * x_cdf)
+    ax3.plot(x_cdf, theoretical_cdf, 'r--', linewidth=2,
+             label=f'Theoretical CDF Exp(lambda={lambda_hat:.2f})')
+    ax3.set_xlabel('Duration (seconds)', fontsize=11)
+    ax3.set_ylabel('Cumulative probability', fontsize=11)
+    ax3.set_title('CDF Comparison', fontsize=12, fontweight='bold')
+    ax3.legend(fontsize=9)
+
+    plt.tight_layout()
+    save_path = os.path.join(output_dir, 'pow_exponential_analysis.png')
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    print(f"\nSaved: {save_path}")
+    plt.close()
+
+
 def main():
     """
     Main entry point:
       - Run PoW experiments
       - Analyze exponentiality of solution times
       - Print a textual summary
+      - Generate visualizations
     """
 
     n_problems = 100
@@ -233,6 +313,10 @@ def main():
             "(Poisson process hypothesis rejected)."
         )
     print("=" * 70)
+
+    # Generate visualizations
+    print("\nGenerating visualizations...")
+    plot_exponential_visualizations(durations)
 
 
 if __name__ == "__main__":
